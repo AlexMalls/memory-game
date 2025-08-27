@@ -84,6 +84,19 @@
   .btn{ padding: 6px 10px; border: 1px solid #666; background: #1f1f1f; color: #fff; border-radius: 8px; cursor: pointer; }
   .btn:active{ transform: translateY(1px); }
 
+  /* Vídeos em overlay (inserção mínima solicitada) */
+  #introVideo, #victoryVideo {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    background: black;
+    z-index: 2000;
+    display: none;
+  }
+
 </style>
 </head>
 <body>
@@ -128,6 +141,10 @@
 
   <div id="message"></div>
 
+  <!-- vídeos adicionados conforme pedido -->
+  <video id="introVideo" autoplay muted playsinline></video>
+  <video id="victoryVideo" playsinline></video>
+
 <script>
   // ===== Flags =====
   const ADMIN = new URLSearchParams(location.search).has('admin');
@@ -142,7 +159,7 @@
     '60% 30% 50% 40% / 40% 60% 50% 30%',
     '50% 60% 30% 40% / 70% 50% 30% 50%',
     '30% 40% 70% 50% / 50% 30% 50% 70%',
-    '40% 50% 30% 60% / 60% 40% 50% 30%'
+    '40% 50% 30% 60% / 60% 40% 50% 30'
   ];
 
   let correctOrder = [];
@@ -151,6 +168,10 @@
   let stoneSounds = new Array(8).fill(null);
   let errorSound = null;
   const stones = [];
+
+  // elementos de vídeo (inseridos no DOM acima)
+  const introVideoEl = document.getElementById('introVideo');
+  const victoryVideoEl = document.getElementById('victoryVideo');
 
   // Cria as 8 pedras em círculo (1 no topo, sentido horário)
   for (let i = 0; i < 8; i++) {
@@ -239,6 +260,30 @@
       }
     }
     errorSound = cfg.errorSound ? new Audio(cfg.errorSound) : null;
+
+    // Vídeos (novo) - intro e victory
+    try{
+      if (cfg.introVideo){
+        introVideoEl.src = cfg.introVideo;
+        introVideoEl.style.display = 'block';
+        // para garantir autoplay em alguns navegadores, mantemos mudo durante intro
+        introVideoEl.muted = true;
+        introVideoEl.play().catch(()=>{});
+        introVideoEl.onended = () => { introVideoEl.style.display = 'none'; introVideoEl.muted = false; };
+      } else {
+        introVideoEl.style.display = 'none';
+      }
+    }catch(e){ console.warn('erro intro video', e); }
+
+    try{
+      if (cfg.victoryVideo){
+        victoryVideoEl.src = cfg.victoryVideo;
+        victoryVideoEl.style.display = 'none';
+        victoryVideoEl.onended = () => { victoryVideoEl.style.display = 'none'; };
+      } else {
+        victoryVideoEl.style.display = 'none';
+      }
+    }catch(e){ console.warn('erro victory video', e); }
   }
 
   function renderConfigPanel(cfg){
@@ -276,6 +321,13 @@
       playerProgress++;
       if (playerProgress === correctOrder.length){
         setMessage('Parabéns! Você completou a sequência.');
+        // roda vídeo de vitória se informado
+        try{
+          if (victoryVideoEl && victoryVideoEl.src){
+            victoryVideoEl.style.display = 'block';
+            victoryVideoEl.play().catch(()=>{});
+          }
+        }catch(e){ console.warn('erro ao tentar tocar victory video', e); }
       }
     } else {
       flashWrong();

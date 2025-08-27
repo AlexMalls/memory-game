@@ -40,9 +40,6 @@
     transition: 0.3s;
     color: white;
     border: 2px solid #444;
-    background-size: contain;
-    background-repeat: no-repeat;
-    background-position: center;
   }
 
   .stone.correct {
@@ -55,44 +52,120 @@
     box-shadow: 0 0 20px #e53935;
   }
 
+  .config-toggle {
+    position: absolute;
+    top: 10px;
+    right: 20px;
+    cursor: pointer;
+    font-size: 1.5rem;
+  }
+
+  #config {
+    position: fixed;
+    top: 0;
+    right: -320px;
+    width: 300px;
+    height: 100%;
+    background: #333;
+    padding: 20px;
+    box-shadow: -5px 0 10px rgba(0,0,0,0.5);
+    transition: right 0.3s;
+    overflow-y: auto;
+    z-index: 10;
+  }
+
+  #config.open {
+    right: 0;
+  }
+
+  #config h2 {
+    margin-top: 0;
+  }
+
+  .order-input {
+    width: 100%;
+    padding: 5px;
+    margin-bottom: 10px;
+  }
+
+  .symbol-config {
+    display: flex;
+    align-items: center;
+    margin: 5px 0;
+  }
+
+  .symbol-config label {
+    width: 30px;
+    margin-right: 10px;
+  }
+
   #message {
     margin-top: 20px;
     font-size: 1.2rem;
   }
 
-  /* Vídeos em tela cheia */
-  #introVideo, #victoryVideo {
+  /* Overlay de vídeo */
+  .video-overlay {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
     background: black;
-    z-index: 1000;
-    display: none;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+  }
+
+  .video-overlay video {
+    max-width: 100%;
+    max-height: 100%;
   }
 </style>
 </head>
 <body>
-  <h1>Jogo da Sequência</h1>
+  <h1 id="gameTitle">Jogo da Sequência</h1>
   <div class="circle" id="circle"></div>
+
+  <div class="config-toggle" onclick="toggleConfig()">⚙️</div>
+
+  <div id="config">
+    <h2>Configurações</h2>
+    <p>Defina a ordem correta (números separados por vírgula, ex: 1,3,5,2,...):</p>
+    <input type="text" id="orderInput" class="order-input" placeholder="Ex: 1,2,3,4,5,6,7,8">
+    <button onclick="setOrder()">Definir Ordem</button>
+    <h3>Carregar símbolos</h3>
+    <div id="symbolUploads"></div>
+  </div>
 
   <div id="message"></div>
 
-  <!-- Vídeos -->
-  <video id="introVideo" autoplay></video>
-  <video id="victoryVideo"></video>
+  <!-- Overlays de vídeo -->
+  <div id="introOverlay" class="video-overlay" style="display:none;">
+    <video id="introVideo" autoplay muted></video>
+  </div>
+  <div id="victoryOverlay" class="video-overlay" style="display:none;">
+    <video id="victoryVideo"></video>
+  </div>
 
 <script>
   const circle = document.getElementById("circle");
-  const stones = [];
+  const stoneShapes = [
+    "20% 50% 40% 60% / 30% 50% 50% 70%",
+    "40% 60% 20% 50% / 60% 30% 70% 40%",
+    "50% 40% 60% 30% / 50% 70% 30% 50%",
+    "30% 70% 50% 40% / 50% 30% 70% 50%",
+    "60% 30% 50% 40% / 40% 60% 50% 30%",
+    "50% 60% 30% 40% / 70% 50% 30% 50%",
+    "30% 40% 70% 50% / 50% 30% 50% 70%",
+    "40% 50% 30% 60% / 60% 40% 50% 30%"
+  ];
+
+  let images = new Array(8).fill(null);
   let correctOrder = [];
   let playerProgress = 0;
-
-  let sounds = [];
-  let errorSound = null;
-  let introVideo = null;
-  let victoryVideo = null;
+  const stones = [];
 
   // Criar botões em círculo numerados
   for (let i = 0; i < 8; i++) {
@@ -104,6 +177,7 @@
     btn.classList.add("stone");
     btn.style.left = x + "px";
     btn.style.top = y + "px";
+    btn.style.borderRadius = stoneShapes[i];
     btn.textContent = i+1;
 
     btn.onclick = () => handleClick(i+1, btn);
@@ -112,75 +186,58 @@
     stones.push(btn);
   }
 
-  // Função carregar configurações
-  fetch("config.json")
-    .then(res => res.json())
-    .then(cfg => {
-      // ordem correta
-      correctOrder = cfg.order || [];
-
-      // fundo
-      if (cfg.background) {
-        document.body.style.backgroundImage = `url(${cfg.background})`;
-        document.body.style.backgroundSize = "cover";
-      }
-
-      // símbolos
-      if (cfg.symbols) {
-        cfg.symbols.forEach((src, i) => {
-          if (stones[i]) {
-            stones[i].textContent = "";
-            stones[i].style.backgroundImage = `url(${src})`;
-          }
-        });
-      }
-
-      // sons
-      if (cfg.sounds) {
-        sounds = cfg.sounds.map(src => new Audio(src));
-      }
-      if (cfg.errorSound) {
-        errorSound = new Audio(cfg.errorSound);
-      }
-
-      // vídeos
-      if (cfg.introVideo) {
-        introVideo = document.getElementById("introVideo");
-        introVideo.src = cfg.introVideo;
-        introVideo.style.display = "block";
-        introVideo.onended = () => {
-          introVideo.style.display = "none";
+  // uploads
+  const uploadsContainer = document.getElementById("symbolUploads");
+  for (let i = 0; i < 8; i++) {
+    const div = document.createElement("div");
+    div.classList.add("symbol-config");
+    const label = document.createElement("label");
+    label.textContent = i+1;
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/png";
+    input.onchange = e => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = ev => {
+          images[i] = ev.target.result;
+          stones[i].textContent = "";
+          stones[i].style.backgroundImage = `url(${images[i]})`;
+          stones[i].style.backgroundSize = "contain";
+          stones[i].style.backgroundRepeat = "no-repeat";
+          stones[i].style.backgroundPosition = "center";
         };
+        reader.readAsDataURL(file);
       }
-      if (cfg.victoryVideo) {
-        victoryVideo = document.getElementById("victoryVideo");
-        victoryVideo.src = cfg.victoryVideo;
-        victoryVideo.onended = () => {
-          victoryVideo.style.display = "none";
-        };
-      }
+    };
+    div.appendChild(label);
+    div.appendChild(input);
+    uploadsContainer.appendChild(div);
+  }
 
-      document.getElementById("message").textContent = "Jogo pronto!";
-    });
+  function setOrder() {
+    const input = document.getElementById("orderInput").value.trim();
+    if (!input) return;
+    correctOrder = input.split(",").map(n => parseInt(n.trim()));
+    playerProgress = 0;
+    clearStones();
+    document.getElementById("message").textContent = "Ordem definida. Jogo iniciado!";
+  }
 
   function handleClick(num, btn) {
     if (correctOrder.length === 0) return;
 
     if (num === correctOrder[playerProgress]) {
       btn.classList.add("correct");
-      if (sounds[num-1]) sounds[num-1].play();
       playerProgress++;
       if (playerProgress === correctOrder.length) {
         document.getElementById("message").textContent = "Parabéns! Você completou a sequência.";
-        if (victoryVideo) {
-          victoryVideo.style.display = "block";
-          victoryVideo.play();
-        }
+        playVictoryVideo();
       }
     } else {
       flashWrong();
       document.getElementById("message").textContent = "Errou! Reiniciando...";
-      if (errorSound) errorSound.play();
       playerProgress = 0;
       setTimeout(clearStones, 1000);
     }
@@ -204,6 +261,48 @@
       btn.classList.remove("wrong");
     });
   }
+
+  function toggleConfig() {
+    document.getElementById("config").classList.toggle("open");
+  }
+
+  // Funções de vídeo
+  function playIntroVideo(src) {
+    if (!src) return;
+    const overlay = document.getElementById("introOverlay");
+    const video = document.getElementById("introVideo");
+    video.src = src;
+    overlay.style.display = "flex";
+    video.play();
+    video.onended = () => {
+      overlay.style.display = "none";
+    };
+  }
+
+  function playVictoryVideo() {
+    if (!window.victorySrc) return;
+    const overlay = document.getElementById("victoryOverlay");
+    const video = document.getElementById("victoryVideo");
+    video.src = window.victorySrc;
+    overlay.style.display = "flex";
+    video.play();
+    video.onended = () => {
+      overlay.style.display = "none";
+    };
+  }
+
+  // Carregar config.json
+  fetch("config.json")
+    .then(r => r.json())
+    .then(cfg => {
+      if (cfg.introVideo) {
+        playIntroVideo(cfg.introVideo);
+      }
+      if (cfg.victoryVideo) {
+        window.victorySrc = cfg.victoryVideo;
+      }
+    })
+    .catch(err => console.warn("Sem config.json ou erro ao carregar:", err));
 </script>
 </body>
 </html>

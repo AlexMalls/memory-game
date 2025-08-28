@@ -132,6 +132,7 @@
       correctOrder = cfg.order.slice();
       playerProgress = 0;
       clearStones();
+      updateVignette();
     }
     if (cfg.background){
       document.body.style.backgroundImage = `url(${cfg.background})`;
@@ -177,17 +178,18 @@
       }
 
     } else {
+      playerProgress = 0; // reseta progresso
+      updateVignette();   // reseta vinheta
       flashWrong();
       if (errorSound){ try{ errorSound.currentTime = 0; errorSound.play(); }catch(e){} }
-      playerProgress = 0;
-      updateVignette();
       setTimeout(clearStones, 900);
     }
   }
 
+  // Vinheta conforme progresso
   function updateVignette(){
-    const progressRatio = playerProgress / correctOrder.length;
-    vignette.style.opacity = 1.6 + progressRatio * 4; // vinheta cresce conforme o progresso
+    let progressRatio = playerProgress / correctOrder.length;
+    vignette.style.opacity = Math.min(1, 0.8 + progressRatio * 1);
   }
 
   function flashWrong(){
@@ -209,30 +211,38 @@
     m.textContent = msg || '';
   }
 
-  // ===== Cintilada final =====
+  // Cintilada final
   function sparkleStones(){
     return new Promise(resolve=>{
       let count = 0;
       const interval = setInterval(()=>{
         stones.forEach(btn=>{
           if (btn.classList.contains('correct')){
-            btn.style.boxShadow = `0 0 ${10 + 5*Math.sin(count*Math.PI/4)}px #FFD700`;
+            const glow = 10 + 5*Math.sin(count*Math.PI/4);
+            btn.style.boxShadow = `0 0 ${glow}px #ffed8f`;
+            btn.style.filter = `brightness(${1 + 0.3*Math.sin(count*Math.PI/4)})`;
           }
         });
         count++;
         if(count>8){ 
           clearInterval(interval); 
-          stones.forEach(btn=> btn.style.boxShadow = '0 0 15px #FFD700');
+          stones.forEach(btn=> {
+            if (btn.classList.contains('correct')){
+              btn.style.boxShadow = '0 0 15px #ffed8f';
+              btn.style.filter = 'brightness(1)';
+            }
+          });
           resolve();
         }
       }, 80);
     });
   }
 
-  // ===== Fade =====
+  // Fade-out do fundo
   const fadeEl = document.getElementById('fadeOverlay');
   function fadeIn(){ fadeEl.style.opacity = 0; }
   function fadeOut(){
+    fadeEl.style.transition = 'opacity 6s ease';
     fadeEl.style.opacity = 1;
     setTimeout(()=> alert('Jogo finalizado!'), 6000);
   }

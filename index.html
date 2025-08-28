@@ -174,7 +174,9 @@
       updateVignette();
 
       if (playerProgress === correctOrder.length){
-        sparkleStones().then(()=> fadeOut());
+        sparkleStones()
+        .then(()=> animateVignetteFlash()) // brilho do fundo
+        .then(()=> fadeOut());            // só depois faz fade-out
       }
 
     } else {
@@ -212,6 +214,42 @@
   function setMessage(msg){
     const m = document.getElementById('message');
     m.textContent = msg || '';
+  }
+  function animateVignetteFlash(){
+      return new Promise(resolve=>{
+          let start = null;
+          let direction = 1; // 1 = expandir, -1 = retrair
+          let centerPercent = 10;
+  
+          function step(timestamp){
+              if(!start) start = timestamp;
+              let progress = (timestamp - start) / 800; // duração 0.8s
+              if(progress > 1) progress = 1;
+  
+              if(direction === 1){
+                  centerPercent = 10 + (60-10) * progress; // 10% → 60%
+              } else {
+                  centerPercent = 60 - (60-10) * progress; // 60% → 10%
+              }
+  
+              vignette.style.background = `radial-gradient(circle, rgba(0,0,0,0) ${centerPercent}%, rgba(0,0,0,1) 100%)`;
+  
+              if(progress < 1){
+                  requestAnimationFrame(step);
+              } else {
+                  if(direction === 1){
+                      // inverter direção e reiniciar
+                      direction = -1;
+                      start = null;
+                      requestAnimationFrame(step);
+                  } else {
+                      resolve(); // animação completa
+                  }
+              }
+          }
+  
+          requestAnimationFrame(step);
+      });
   }
 
   // Cintilada final

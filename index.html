@@ -55,7 +55,7 @@
     width:100%; height:100%;
     pointer-events:none;
     z-index:2000;
-    background: radial-gradient(circle, rgba(0,0,0,0) 60%, rgba(0,0,0,0.7) 100%);
+    background: radial-gradient(circle, rgba(0,0,0,0) 60%, rgba(0,0,0,1) 100%);
     opacity:0;
     transition: opacity 0.3s ease;
   }
@@ -189,8 +189,10 @@
   // Vinheta conforme progresso
   function updateVignette(){
       let progressRatio = playerProgress / correctOrder.length;
-      // opacidade sem limite máximo
-      vignette.style.opacity = 0.8 + progressRatio * 1;
+      // centro transparente diminui de 60% para 0%
+      let centerPercent = Math.max(0, 60 - 60 * progressRatio);
+      vignette.style.background = `radial-gradient(circle, rgba(0,0,0,0) ${centerPercent}%, rgba(0,0,0,1) 100%)`;
+      vignette.style.opacity = 1; // manter totalmente visível
   }
 
   function flashWrong(){

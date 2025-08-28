@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>Jogo da Sequência - Pedras</title>
+<title>O Exilio da Praga - Runes</title>
 <style>
   body {
     display: flex;
@@ -60,7 +60,6 @@
 </style>
 </head>
 <body>
-  <h1>Jogo da Sequência</h1>
   <div class="circle" id="circle"></div>
   <div id="message"></div>
   <div id="fadeOverlay"></div>
@@ -161,13 +160,11 @@
       }
       playerProgress++;
       if (playerProgress === correctOrder.length){
-        setMessage('Parabéns! Você completou a sequência.');
         fadeOut();
       }
     } else {
       flashWrong();
       if (errorSound){ try{ errorSound.currentTime = 0; errorSound.play(); }catch(e){} }
-      setMessage('Errou! Reiniciando...');
       playerProgress = 0;
       setTimeout(clearStones, 900);
     }
@@ -197,7 +194,7 @@
   function fadeIn(){ fadeEl.style.opacity = 0; }
   function fadeOut(){
     fadeEl.style.opacity = 1;
-    setTimeout(()=> alert('Jogo finalizado!'), 1200);
+    setTimeout(()=> 1200);
   }
 
   window.addEventListener('load', ()=>{

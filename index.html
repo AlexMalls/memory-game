@@ -15,6 +15,7 @@
     color: white;
     font-family: Arial, sans-serif;
     overflow: hidden;
+    position: relative;
   }
 
   h1 { margin-bottom: 20px; }
@@ -36,15 +37,28 @@
     justify-content: center;
     font-size: 1.8rem;
     cursor: pointer;
-    transition: 0.25s;
+    transition: 0.25s, box-shadow 0.5s;
     color: white;
     border: 2px solid #444;
     user-select: none;
   }
   .stone:hover{ transform: translateY(-2px); }
 
-  .stone.correct { background: #4caf50; box-shadow: 0 0 20px #4caf50; }
-  .stone.wrong   { background: #e53935; box-shadow: 0 0 20px #e53935; }
+  /* cores das pedras */
+  .stone.correct { background: #FFD700; box-shadow: 0 0 15px #FFD700; }
+  .stone.wrong   { background: #E57373; box-shadow: 0 0 15px #E57373; }
+
+  /* Vinheta nas laterais */
+  #vignette {
+    position: fixed;
+    top:0; left:0;
+    width:100%; height:100%;
+    pointer-events:none;
+    z-index:2000;
+    background: radial-gradient(circle, rgba(0,0,0,0) 60%, rgba(0,0,0,0.7) 100%);
+    opacity:0;
+    transition: opacity 0.3s ease;
+  }
 
   /* Overlay preto para fade */
   #fadeOverlay {
@@ -62,10 +76,12 @@
 <body>
   <div class="circle" id="circle"></div>
   <div id="message"></div>
+  <div id="vignette"></div>
   <div id="fadeOverlay"></div>
 
 <script>
   const circle = document.getElementById('circle');
+  const vignette = document.getElementById('vignette');
   const stoneShapes = [
     '20% 50% 40% 60% / 30% 50% 50% 70%',
     '40% 60% 20% 50% / 60% 30% 70% 40%',
@@ -100,7 +116,6 @@
     stones.push(btn);
   }
 
-  // ====== Lê config.json e aplica ======
   async function loadConfig(force = false){
     try{
       const res = await fetch('config.json', { cache: force ? 'no-store' : 'default' });
@@ -113,19 +128,16 @@
   }
 
   function applyConfig(cfg){
-    // Ordem
     if (Array.isArray(cfg.order) && cfg.order.length === 8){
       correctOrder = cfg.order.slice();
       playerProgress = 0;
       clearStones();
     }
-    // Background
     if (cfg.background){
       document.body.style.backgroundImage = `url(${cfg.background})`;
       document.body.style.backgroundSize = 'cover';
       document.body.style.backgroundPosition = 'center';
     }
-    // Símbolos (imagens)
     if (Array.isArray(cfg.symbols)){
       for (let i=0;i<8;i++){
         stoneImages[i] = cfg.symbols[i] || null;
@@ -141,7 +153,6 @@
         }
       }
     }
-    // Sons
     if (Array.isArray(cfg.sounds)){
       for (let i=0;i<8;i++){
         stoneSounds[i] = cfg.sounds[i] ? new Audio(cfg.sounds[i]) : null;
@@ -150,24 +161,33 @@
     errorSound = cfg.errorSound ? new Audio(cfg.errorSound) : null;
   }
 
-  // ====== Jogo ======
   function handleClick(num, btn){
     if (!correctOrder.length) return;
+
     if (num === correctOrder[playerProgress]){
       btn.classList.add('correct');
       if (stoneSounds[num-1]){
         try{ stoneSounds[num-1].currentTime = 0; stoneSounds[num-1].play(); }catch(e){}
       }
       playerProgress++;
+      updateVignette();
+
       if (playerProgress === correctOrder.length){
-        fadeOut();
+        sparkleStones().then(()=> fadeOut());
       }
+
     } else {
       flashWrong();
       if (errorSound){ try{ errorSound.currentTime = 0; errorSound.play(); }catch(e){} }
       playerProgress = 0;
+      updateVignette();
       setTimeout(clearStones, 900);
     }
+  }
+
+  function updateVignette(){
+    const progressRatio = playerProgress / correctOrder.length;
+    vignette.style.opacity = 0.2 + progressRatio * 0.5; // vinheta cresce conforme o progresso
   }
 
   function flashWrong(){
@@ -189,12 +209,32 @@
     m.textContent = msg || '';
   }
 
+  // ===== Cintilada final =====
+  function sparkleStones(){
+    return new Promise(resolve=>{
+      let count = 0;
+      const interval = setInterval(()=>{
+        stones.forEach(btn=>{
+          if (btn.classList.contains('correct')){
+            btn.style.boxShadow = `0 0 ${10 + 5*Math.sin(count*Math.PI/4)}px #FFD700`;
+          }
+        });
+        count++;
+        if(count>8){ 
+          clearInterval(interval); 
+          stones.forEach(btn=> btn.style.boxShadow = '0 0 15px #FFD700');
+          resolve();
+        }
+      }, 80);
+    });
+  }
+
   // ===== Fade =====
   const fadeEl = document.getElementById('fadeOverlay');
   function fadeIn(){ fadeEl.style.opacity = 0; }
   function fadeOut(){
     fadeEl.style.opacity = 1;
-    setTimeout(()=> 1200);
+    setTimeout(()=> alert('Jogo finalizado!'), 1200);
   }
 
   window.addEventListener('load', ()=>{

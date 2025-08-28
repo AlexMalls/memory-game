@@ -188,8 +188,9 @@
 
   // Vinheta conforme progresso
   function updateVignette(){
-    let progressRatio = playerProgress / correctOrder.length;
-    vignette.style.opacity = Math.min(1, 0.8 + progressRatio * 1);
+      let progressRatio = playerProgress / correctOrder.length;
+      // opacidade sem limite máximo
+      vignette.style.opacity = 0.8 + progressRatio * 1;
   }
 
   function flashWrong(){

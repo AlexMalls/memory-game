@@ -4,9 +4,7 @@
 <meta charset="UTF-8">
 <title>Jogo da Sequência - Pedras</title>
 <style>
-  :root{
-    --panel-w: 340px;
-  }
+  :root{ --panel-w: 340px; }
   body {
     display: flex;
     flex-direction: column;
@@ -17,6 +15,7 @@
     background: #1a1a1a;
     color: white;
     font-family: Arial, sans-serif;
+    overflow: hidden;
   }
 
   h1 { margin-bottom: 20px; }
@@ -42,38 +41,15 @@
     color: white;
     border: 2px solid #444;
     user-select: none;
+    transform: scale(0);
+    opacity: 0;
   }
-  .stone:hover{ transform: translateY(-2px); }
-
+  .stone:hover{ transform: translateY(-2px) scale(1); }
   .stone.correct { background: #4caf50; box-shadow: 0 0 20px #4caf50; }
   .stone.wrong   { background: #e53935; box-shadow: 0 0 20px #e53935; }
 
-  /* Toggle sempre visível, sobre o painel */
-  .config-toggle {
-    position: fixed;
-    top: 10px;
-    right: 14px;
-    cursor: pointer;
-    font-size: 1.6rem;
-    z-index: 1002;
-    background: rgba(0,0,0,0.35);
-    padding: 6px 10px;
-    border-radius: 10px;
-  }
-
-  #config {
-    position: fixed;
-    top: 0;
-    right: calc(var(--panel-w) * -1);
-    width: var(--panel-w);
-    height: 100%;
-    background: #2c2c2c;
-    padding: 18px 16px;
-    box-shadow: -5px 0 12px rgba(0,0,0,0.55);
-    transition: right 0.28s ease;
-    overflow-y: auto;
-    z-index: 1001;
-  }
+  .config-toggle { position: fixed; top: 10px; right: 14px; cursor: pointer; font-size: 1.6rem; z-index: 1002; background: rgba(0,0,0,0.35); padding: 6px 10px; border-radius: 10px; }
+  #config { position: fixed; top: 0; right: calc(var(--panel-w) * -1); width: var(--panel-w); height: 100%; background: #2c2c2c; padding: 18px 16px; box-shadow: -5px 0 12px rgba(0,0,0,0.55); transition: right 0.28s ease; overflow-y: auto; z-index: 1001; }
   #config.open { right: 0; }
   #config h2 { margin: 6px 0 12px; }
   #config .sec { margin: 14px 0; }
@@ -84,19 +60,14 @@
   .btn{ padding: 6px 10px; border: 1px solid #666; background: #1f1f1f; color: #fff; border-radius: 8px; cursor: pointer; }
   .btn:active{ transform: translateY(1px); }
 
-  /* Vídeos em overlay (inserção mínima solicitada) */
   #introVideo, #victoryVideo {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    background: black;
-    z-index: 2000;
-    display: none;
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; background: black; z-index: 2000; display: none;
   }
 
+  #fadeOverlay {
+    position: fixed; top:0; left:0; width:100%; height:100%; background:black; z-index:1999;
+    opacity:1; pointer-events:none; transition: opacity 1s;
+  }
 </style>
 </head>
 <body>
@@ -108,257 +79,124 @@
   <div id="config">
     <h2>Configurações (somente leitura)</h2>
     <div class="muted">As definições vêm de <span class="mono">config.json</span>. Para editar para todos os jogadores, altere esse arquivo no projeto e publique novamente.</div>
-
-    <div class="sec">
-      <button class="btn" id="reloadCfg">Recarregar config</button>
-    </div>
-
-    <div class="sec">
-      <strong>Ordem atual</strong>
-      <div id="cfgOrder" class="mono">[não carregado]</div>
-    </div>
-
-    <div class="sec">
-      <strong>Background</strong>
-      <div id="cfgBg" class="mono">(nenhum)</div>
-    </div>
-
-    <div class="sec">
-      <strong>Símbolos</strong>
-      <ol id="cfgSymbols" class="list"></ol>
-    </div>
-
-    <div class="sec">
-      <strong>Sons</strong>
-      <ol id="cfgSounds" class="list"></ol>
-      <div><strong>Som de erro:</strong> <span id="cfgErr" class="mono">(nenhum)</span></div>
-    </div>
-
-    <div class="sec muted">
-      <div>Modo Admin via URL: adicione <code>?admin=1</code> para exibir/ocultar este painel.</div>
-    </div>
+    <div class="sec"><button class="btn" id="reloadCfg">Recarregar config</button></div>
+    <div class="sec"><strong>Ordem atual</strong><div id="cfgOrder" class="mono">[não carregado]</div></div>
+    <div class="sec"><strong>Background</strong><div id="cfgBg" class="mono">(nenhum)</div></div>
+    <div class="sec"><strong>Símbolos</strong><ol id="cfgSymbols" class="list"></ol></div>
+    <div class="sec"><strong>Sons</strong><ol id="cfgSounds" class="list"></ol><div><strong>Som de erro:</strong> <span id="cfgErr" class="mono">(nenhum)</span></div></div>
+    <div class="sec muted"><div>Modo Admin via URL: adicione <code>?admin=1</code> para exibir/ocultar este painel.</div></div>
   </div>
 
   <div id="message"></div>
 
-  <!-- vídeos adicionados conforme pedido -->
   <video id="introVideo" autoplay muted playsinline></video>
   <video id="victoryVideo" playsinline></video>
+  <div id="fadeOverlay"></div>
 
 <script>
-  // ===== Flags =====
-  const ADMIN = new URLSearchParams(location.search).has('admin');
+const ADMIN = new URLSearchParams(location.search).has('admin');
+const circle = document.getElementById('circle');
+const stoneShapes = ['20% 50% 40% 60% / 30% 50% 50% 70%','40% 60% 20% 50% / 60% 30% 70% 40%','50% 40% 60% 30% / 50% 70% 30% 50%','30% 70% 50% 40% / 50% 30% 70% 50%','60% 30% 50% 40% / 40% 60% 50% 30%','50% 60% 30% 40% / 70% 50% 30% 50%','30% 40% 70% 50% / 50% 30% 50% 70%','40% 50% 30% 60% / 60% 40% 50% 30'];
 
-  // ===== Layout das pedras =====
-  const circle = document.getElementById('circle');
-  const stoneShapes = [
-    '20% 50% 40% 60% / 30% 50% 50% 70%',
-    '40% 60% 20% 50% / 60% 30% 70% 40%',
-    '50% 40% 60% 30% / 50% 70% 30% 50%',
-    '30% 70% 50% 40% / 50% 30% 70% 50%',
-    '60% 30% 50% 40% / 40% 60% 50% 30%',
-    '50% 60% 30% 40% / 70% 50% 30% 50%',
-    '30% 40% 70% 50% / 50% 30% 50% 70%',
-    '40% 50% 30% 60% / 60% 40% 50% 30%'
-  ];
+let correctOrder=[], playerProgress=0, stoneImages=new Array(8).fill(null), stoneSounds=new Array(8).fill(null), errorSound=null;
+const stones=[];
+const introVideoEl=document.getElementById('introVideo');
+const victoryVideoEl=document.getElementById('victoryVideo');
+const fadeOverlay=document.getElementById('fadeOverlay');
 
-  let correctOrder = [];
-  let playerProgress = 0;
-  let stoneImages = new Array(8).fill(null);
-  let stoneSounds = new Array(8).fill(null);
-  let errorSound = null;
-  const stones = [];
+// cria pedras
+for(let i=0;i<8;i++){
+  const angle=(i/8)*(2*Math.PI);
+  const x=160+160*Math.cos(angle-Math.PI/2);
+  const y=160+160*Math.sin(angle-Math.PI/2);
+  const btn=document.createElement('div');
+  btn.className='stone';
+  btn.style.left=x+'px';
+  btn.style.top=y+'px';
+  btn.style.borderRadius=stoneShapes[i];
+  btn.textContent=(i+1);
+  btn.addEventListener('click',()=>handleClick(i+1,btn));
+  circle.appendChild(btn);
+  stones.push(btn);
+}
 
-  // elementos de vídeo (inseridos no DOM acima)
-  const introVideoEl = document.getElementById('introVideo');
-  const victoryVideoEl = document.getElementById('victoryVideo');
+// config
+const panel=document.getElementById('config');
+const toggle=document.getElementById('toggle');
+const reloadBtn=document.getElementById('reloadCfg');
+const elOrder=document.getElementById('cfgOrder');
+const elBg=document.getElementById('cfgBg');
+const elSyms=document.getElementById('cfgSymbols');
+const elSnds=document.getElementById('cfgSounds');
+const elErr=document.getElementById('cfgErr');
+if(!ADMIN){panel.classList.remove('open');toggle.style.display='none';}
+else toggle.addEventListener('click',()=>panel.classList.toggle('open'));
+reloadBtn.addEventListener('click',()=>loadConfig(true));
 
-  // Cria as 8 pedras em círculo (1 no topo, sentido horário)
-  for (let i = 0; i < 8; i++) {
-    const angle = (i / 8) * (2 * Math.PI);
-    const x = 160 + 160 * Math.cos(angle - Math.PI/2);
-    const y = 160 + 160 * Math.sin(angle - Math.PI/2);
-    const btn = document.createElement('div');
-    btn.className = 'stone';
-    btn.style.left = x + 'px';
-    btn.style.top  = y + 'px';
-    btn.style.borderRadius = stoneShapes[i];
-    btn.textContent = (i+1);
-    btn.addEventListener('click', () => handleClick(i+1, btn));
-    circle.appendChild(btn);
-    stones.push(btn);
-  }
+async function loadConfig(force=false){
+  try{
+    const res=await fetch('config.json',{cache:force?'no-store':'default'});
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    const cfg=await res.json();
+    applyConfig(cfg);
+    renderConfigPanel(cfg);
+    startIntroAnimation(cfg);
+    setMessage('Configuração carregada com sucesso.');
+  }catch(err){console.error(err);setMessage('Não foi possível carregar config.json. Usando padrões locais.'); startIntroAnimation({});}
+}
 
-  // ====== Config (somente leitura) ======
-  const panel  = document.getElementById('config');
-  const toggle = document.getElementById('toggle');
-  const reloadBtn = document.getElementById('reloadCfg');
-  const elOrder = document.getElementById('cfgOrder');
-  const elBg    = document.getElementById('cfgBg');
-  const elSyms  = document.getElementById('cfgSymbols');
-  const elSnds  = document.getElementById('cfgSounds');
-  const elErr   = document.getElementById('cfgErr');
+function applyConfig(cfg){
+  if(Array.isArray(cfg.order)&&cfg.order.length===8){correctOrder=cfg.order.slice();playerProgress=0;clearStones();}
+  if(cfg.background){document.body.style.backgroundImage=`url(${cfg.background})`;document.body.style.backgroundSize='cover';document.body.style.backgroundPosition='center';}else document.body.style.backgroundImage='';
+  if(Array.isArray(cfg.symbols)){for(let i=0;i<8;i++){stoneImages[i]=cfg.symbols[i]||null;if(stoneImages[i]){stones[i].textContent='';stones[i].style.backgroundImage=`url(${stoneImages[i]})`;stones[i].style.backgroundSize='contain';stones[i].style.backgroundRepeat='no-repeat';stones[i].style.backgroundPosition='center';}else{stones[i].style.backgroundImage='none';stones[i].textContent=(i+1);}}}
+  if(Array.isArray(cfg.sounds)){for(let i=0;i<8;i++){stoneSounds[i]=cfg.sounds[i]?new Audio(cfg.sounds[i]):null;}}
+  errorSound=cfg.errorSound?new Audio(cfg.errorSound):null;
 
-  if (!ADMIN) {
-    panel.classList.remove('open');
-    toggle.style.display = 'none';
+  if(cfg.introVideo){introVideoEl.src=cfg.introVideo;introVideoEl.style.display='block';introVideoEl.muted=true;introVideoEl.play().catch(()=>{});introVideoEl.onended=()=>{introVideoEl.style.display='none';fadeOverlay.style.opacity=0; animateStones(); }}
+  else{fadeOverlay.style.opacity=1; fadeInBackground();}
+  if(cfg.victoryVideo) victoryVideoEl.src=cfg.victoryVideo;
+}
+
+function renderConfigPanel(cfg){
+  elOrder.textContent=Array.isArray(cfg.order)?JSON.stringify(cfg.order):'(não definido)';
+  elBg.textContent=cfg.background||'(nenhum)';
+  elSyms.innerHTML='';
+  (cfg.symbols||[]).forEach(s=>{const li=document.createElement('li');li.className='mono';li.textContent=s||'(padrão numérico)';elSyms.appendChild(li);});
+  elSnds.innerHTML='';
+  (cfg.sounds||[]).forEach(s=>{const li=document.createElement('li');li.className='mono';li.textContent=s||'(sem som)';elSnds.appendChild(li);});
+  elErr.textContent=cfg.errorSound||'(sem som)';
+}
+
+// ===== Jogo =====
+function handleClick(num,btn){
+  if(!correctOrder.length)return;
+  if(num===correctOrder[playerProgress]){
+    btn.classList.add('correct');
+    if(stoneSounds[num-1]){try{stoneSounds[num-1].currentTime=0;stoneSounds[num-1].play();}catch(e){}}
+    playerProgress++;
+    if(playerProgress===correctOrder.length){
+      setMessage('Parabéns! Você completou a sequência.');
+      if(victoryVideoEl.src){victoryVideoEl.style.display='block';victoryVideoEl.play().catch(()=>{});victoryVideoEl.onended=()=>victoryVideoEl.style.display='none';}
+      else fadeOutGame();
+    }
   } else {
-    toggle.addEventListener('click', () => panel.classList.toggle('open'));
+    flashWrong();
+    if(errorSound){try{errorSound.currentTime=0;errorSound.play();}catch(e){}}
+    setMessage('Errou! Reiniciando...');
+    playerProgress=0;
+    setTimeout(clearStones,900);
   }
-  reloadBtn.addEventListener('click', () => loadConfig(true));
+}
+function flashWrong(){stones.forEach(btn=>{if(btn.classList.contains('correct')){btn.classList.remove('correct');btn.classList.add('wrong');}});setTimeout(()=>stones.forEach(b=>b.classList.remove('wrong')),700);}
+function clearStones(){stones.forEach(btn=>{btn.classList.remove('correct','wrong');btn.style.transform='scale(0)';btn.style.opacity=0;});}
+function setMessage(msg){document.getElementById('message').textContent=msg||'';}
 
-  // ====== Lê config.json e aplica ======
-  async function loadConfig(force = false){
-    try{
-      const res = await fetch('config.json', { cache: force ? 'no-store' : 'default' });
-      if(!res.ok) throw new Error('HTTP '+res.status);
-      const cfg = await res.json();
-      applyConfig(cfg);
-      renderConfigPanel(cfg);
-      setMessage('Configuração carregada com sucesso.');
-    }catch(err){
-      console.error(err);
-      setMessage('Não foi possível carregar config.json. Usando padrões locais.');
-    }
-  }
+// ===== Animacoes =====
+function fadeInBackground(){fadeOverlay.style.opacity=1;setTimeout(()=>{fadeOverlay.style.opacity=0;animateStones();},1000);}
+function animateStones(){stones.forEach((s,i)=>{setTimeout(()=>{s.style.transform='scale(1)';s.style.opacity=1;},i*150);});}
+function fadeOutGame(){fadeOverlay.style.opacity=0;fadeOverlay.style.display='block';setTimeout(()=>{fadeOverlay.style.opacity=1;playerProgress=0;clearStones();fadeOverlay.style.opacity=0;},1000);}
 
-  function applyConfig(cfg){
-    // Ordem
-    if (Array.isArray(cfg.order) && cfg.order.length === 8){
-      correctOrder = cfg.order.slice();
-      playerProgress = 0;
-      clearStones();
-    }
-    // Background
-    if (cfg.background){
-      document.body.style.backgroundImage = `url(${cfg.background})`;
-      document.body.style.backgroundSize = 'cover';
-      document.body.style.backgroundPosition = 'center';
-    } else {
-      document.body.style.backgroundImage = '';
-    }
-    // Símbolos (imagens)
-    if (Array.isArray(cfg.symbols)){
-      for (let i=0;i<8;i++){
-        stoneImages[i] = cfg.symbols[i] || null;
-        if (stoneImages[i]){
-          stones[i].textContent = '';
-          stones[i].style.backgroundImage = `url(${stoneImages[i]})`;
-          stones[i].style.backgroundSize = 'contain';
-          stones[i].style.backgroundRepeat = 'no-repeat';
-          stones[i].style.backgroundPosition = 'center';
-        }else{
-          stones[i].style.backgroundImage = 'none';
-          stones[i].textContent = (i+1);
-        }
-      }
-    }
-    // Sons
-    if (Array.isArray(cfg.sounds)){
-      for (let i=0;i<8;i++){
-        stoneSounds[i] = cfg.sounds[i] ? new Audio(cfg.sounds[i]) : null;
-      }
-    }
-    errorSound = cfg.errorSound ? new Audio(cfg.errorSound) : null;
-
-    // Vídeos (novo) - intro e victory
-    try{
-      if (cfg.introVideo){
-        introVideoEl.src = cfg.introVideo;
-        introVideoEl.style.display = 'block';
-        // para garantir autoplay em alguns navegadores, mantemos mudo durante intro
-        introVideoEl.muted = true;
-        introVideoEl.play().catch(()=>{});
-        introVideoEl.onended = () => { introVideoEl.style.display = 'none'; introVideoEl.muted = false; };
-      } else {
-        introVideoEl.style.display = 'none';
-      }
-    }catch(e){ console.warn('erro intro video', e); }
-
-    try{
-      if (cfg.victoryVideo){
-        victoryVideoEl.src = cfg.victoryVideo;
-        victoryVideoEl.style.display = 'none';
-        victoryVideoEl.onended = () => { victoryVideoEl.style.display = 'none'; };
-      } else {
-        victoryVideoEl.style.display = 'none';
-      }
-    }catch(e){ console.warn('erro victory video', e); }
-  }
-
-  function renderConfigPanel(cfg){
-    elOrder.textContent = Array.isArray(cfg.order) ? JSON.stringify(cfg.order) : '(não definido)';
-    elBg.textContent = cfg.background || '(nenhum)';
-
-    elSyms.innerHTML = '';
-    const syms = cfg.symbols || [];
-    for (let i=0;i<8;i++){
-      const li = document.createElement('li');
-      li.className = 'mono';
-      li.textContent = syms[i] || '(padrão numérico)';
-      elSyms.appendChild(li);
-    }
-
-    elSnds.innerHTML = '';
-    const snds = cfg.sounds || [];
-    for (let i=0;i<8;i++){
-      const li = document.createElement('li');
-      li.className = 'mono';
-      li.textContent = snds[i] || '(sem som)';
-      elSnds.appendChild(li);
-    }
-    elErr.textContent = cfg.errorSound || '(sem som)';
-  }
-
-  // ====== Jogo ======
-  function handleClick(num, btn){
-    if (!correctOrder.length) return; // sem config ainda
-    if (num === correctOrder[playerProgress]){
-      btn.classList.add('correct');
-      if (stoneSounds[num-1]){
-        try{ stoneSounds[num-1].currentTime = 0; stoneSounds[num-1].play(); }catch(e){}
-      }
-      playerProgress++;
-      if (playerProgress === correctOrder.length){
-        setMessage('Parabéns! Você completou a sequência.');
-        // roda vídeo de vitória se informado
-        try{
-          if (victoryVideoEl && victoryVideoEl.src){
-            victoryVideoEl.style.display = 'block';
-            victoryVideoEl.play().catch(()=>{});
-          }
-        }catch(e){ console.warn('erro ao tentar tocar victory video', e); }
-      }
-    } else {
-      flashWrong();
-      if (errorSound){ try{ errorSound.currentTime = 0; errorSound.play(); }catch(e){} }
-      setMessage('Errou! Reiniciando...');
-      playerProgress = 0;
-      setTimeout(clearStones, 900);
-    }
-  }
-
-  function flashWrong(){
-    stones.forEach(btn => {
-      if (btn.classList.contains('correct')){
-        btn.classList.remove('correct');
-        btn.classList.add('wrong');
-      }
-    });
-    setTimeout(()=> stones.forEach(b=> b.classList.remove('wrong')), 700);
-  }
-
-  function clearStones(){
-    stones.forEach(btn => { btn.classList.remove('correct','wrong'); });
-  }
-
-  function setMessage(msg){
-    const m = document.getElementById('message');
-    m.textContent = msg || '';
-  }
-
-  // Inicializa
-  loadConfig();
+loadConfig();
 </script>
 </body>
 </html>

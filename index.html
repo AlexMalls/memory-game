@@ -181,12 +181,50 @@
   }
 
   function applyConfig(cfg){
-    if(Array.isArray(cfg.order) && cfg.order.length===8){
+    // Ordem
+    if (Array.isArray(cfg.order) && cfg.order.length === 8){
       correctOrder = cfg.order.slice();
-      playerProgress=0;
+      playerProgress = 0;
       clearStones();
     }
+  
+    // Background
+    if (cfg.background){
+      document.body.style.backgroundImage = `url(${cfg.background})`;
+      document.body.style.backgroundSize = 'cover';
+      document.body.style.backgroundPosition = 'center';
+    } else {
+      document.body.style.backgroundImage = '';
+    }
+  
+    // Símbolos (imagens)
+    if (Array.isArray(cfg.symbols)){
+      for (let i=0;i<8;i++){
+        stoneImages[i] = cfg.symbols[i] || null;
+        if (stoneImages[i]){
+          stones[i].textContent = '';
+          stones[i].style.backgroundImage = `url(${stoneImages[i]})`;
+          stones[i].style.backgroundSize = 'contain';
+          stones[i].style.backgroundRepeat = 'no-repeat';
+          stones[i].style.backgroundPosition = 'center';
+        } else {
+          stones[i].style.backgroundImage = 'none';
+          stones[i].textContent = (i+1);
+        }
+      }
+    }
+  
+    // Sons
+    if (Array.isArray(cfg.sounds)){
+      for (let i=0;i<8;i++){
+        stoneSounds[i] = cfg.sounds[i] ? new Audio(cfg.sounds[i]) : null;
+      }
+    }
+    errorSound = cfg.errorSound ? new Audio(cfg.errorSound) : null;
+  
+    // Obs: Vídeos removidos
   }
+
 
   function renderConfigPanel(cfg){
     elOrder.textContent = Array.isArray(cfg.order)?JSON.stringify(cfg.order):'(não definido)';
